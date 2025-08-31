@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ENGLISH DICTIONARY</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f7f7fb; margin: 0; padding: 20px; }
+    .container { max-width: 700px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    h1 { text-align: center; }
+    .input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-top: 10px; }
+    .info { margin-top: 10px; color: #666; }
+    .card { margin-top: 20px; border: 1px solid #eee; border-radius: 8px; padding: 15px; }
+    ol { margin-left: 20px; }
+    audio { width: 100%; margin-top: 15px; }
+    .hidden { display: none !important; }
+    .speak-btn { margin-top: 15px; padding: 10px 16px; border: none; border-radius: 8px; background: #5b7cfa; color: white; font-weight: bold; cursor: pointer; }
+    .speak-btn:hover { background: #4a68d6; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>ENGLISH DICTIONARY</h1>
+    <input id="input" class="input" type="text" placeholder="Type a word and press Enter" />
+    <p id="info-text" class="info">TYPE A WORD AND PRESS ENTER</p>
+
+    <div id="meaning-container" class="card hidden">
+      <p><strong>WORD TITLE:</strong> <span id="title">—</span></p>
+      <p><strong>MEANINGS:</strong></p>
+      <ol id="definitions"></ol>
+      <audio id="audio" controls class="hidden"></audio>
+      <button id="speakBtn" class="speak-btn hidden">🔊 Speak Word</button>
+    </div>
+  </div>
+
+  <script>
+    const inputEl = document.getElementById('input');
+    const infoTextEl = document.getElementById('info-text');
+    const meaningContainerEl = document.getElementById('meaning-container');
+    const titleEl = document.getElementById('title');
+    const defsOl = document.getElementById('definitions');
+    const audioEl = document.getElementById('audio');
+    const speakBtn = document.getElementById('speakBtn');
+
+    function setLoading(word) {
+      infoTextEl.textContent = `Searching the meaning of "${word}"...`;
+      meaningContainerEl.classList.add('hidden');
+    }
+
+    function setError(msg) {
+      infoTextEl.textContent = msg;
+      meaningContainerEl.classList.add('hidden');
+    }
+
+    function renderDefinitions(entries) {
+      titleEl.textContent = entries[0].word;
+      defsOl.innerHTML = '';
+
+      for (const entry of entries) {
+        for (const m of (entry.meanings || [])) {
+          for (const d of (m.definitions || [])) {
+            const li = document.createElement('li');
+            li.textContent = d.definition;
+            defsOl.appendChild(li);
+          }
+        }
+      }
+    }
+
+    function pickAudio(entries) {
+      for (const entry of entries) {
+        for (const p of (entry.phonetics || [])) {
+          if (p.audio) return p.audio;
+        }
+      }
+      return '';
+    }
+
+    async function fetchAPI(word) {
+      try {
+        const q = (word || '').trim();
+        if (!q) {
+          setError('Please type a word first.');
+          return;
+        }
+
+        setLoading(q);
+
+        const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(q)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (!Array.isArray(data)) {
+          setError('No definitions found.');
+          return;
+        }
+
+        renderDefinitions(data);
+
+        const audioSrc = pickAudio(data);
+        if (audioSrc) {
+          audioEl.src = audioSrc;
+          audioEl.classList.remove('hidden');
+        } else {
+          audioEl.classList.add('hidden');
+        }
+
+        // Enable custom speech synthesis
+        speakBtn.classList.remove('hidden');
+        speakBtn.onclick = () => {
+          const utterance = new SpeechSynthesisUtterance(data[0].word);
+          speechSynthesis.speak(utterance);
+        };
+
+        infoTextEl.textContent = '';
+        meaningContainerEl.classList.remove('hidden');
+      } catch (err) {
+        console.error(err);
+        setError('An error occurred.');
+      }
+    }
+
+    inputEl.addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') fetchAPI(e.target.value);
+    });
+  </script>
+</body>
+</html>

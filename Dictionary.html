@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ENGLISH DICTIONARY</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'; }
+    body { margin: 0; padding: 24px; background: #f7f7fb; color: #222; }
+    .container { max-width: 680px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.06); }
+    .heading { margin: 0 0 12px; font-size: 28px; letter-spacing: 0.5px; }
+    .row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; }
+    .input { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid #e6e6ef; font-size: 16px; outline: none; }
+    .input:focus { border-color: #5b7cfa; box-shadow: 0 0 0 3px rgba(91,124,250,.2); }
+    .btn { padding: 12px 16px; border-radius: 12px; border: 1px solid #e6e6ef; background: #111; color: #fff; font-weight: 600; cursor: pointer; }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+    .mic-btn { padding: 12px 16px; border-radius: 12px; border: 1px solid #e6e6ef; background: crimson; color: #fff; font-weight: 600; cursor: pointer; }
+    .info { margin: 10px 0 0; font-size: 14px; color: #555; min-height: 1.4em; }
+    .card { margin-top: 18px; border: 1px solid #ececf2; border-radius: 14px; padding: 16px; }
+    .title-line { margin: 0 0 8px; font-weight: 700; }
+    .defs ol { margin: 8px 0 0 18px; }
+    .defs li { margin: 6px 0; line-height: 1.4; }
+    .pos { font-size: 12px; opacity: .7; margin-left: 6px; }
+    audio { width: 100%; margin-top: 10px; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="heading">ENGLISH DICTIONARY</h1>
+
+    <div class="row">
+      <input id="input" class="input" type="text" placeholder="Type a word and press Enter" />
+      <button id="searchBtn" class="btn">Search</button>
+      <button id="micBtn" class="mic-btn">🎤</button>
+    </div>
+
+    <p id="info-text" class="info">TYPE A WORD AND PRESS ENTER</p>
+
+    <div id="meaning-container" class="card hidden">
+      <p class="title-line">WORD TITLE: <span id="title">—</span></p>
+      <div class="defs">
+        <p><strong>MEANING:</strong></p>
+        <ol id="definitions"></ol>
+      </div>
+      <audio id="audio" controls class="hidden"></audio>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const inputEl = document.getElementById('input');
+      const infoTextEl = document.getElementById('info-text');
+      const meaningContainerEl = document.getElementById('meaning-container');
+      const titleEl = document.getElementById('title');
+      const defsOl = document.getElementById('definitions');
+      const audioEl = document.getElementById('audio');
+      const searchBtn = document.getElementById('searchBtn');
+      const micBtn = document.getElementById('micBtn');
+
+      function setLoading(word) {
+        infoTextEl.textContent = `Searching the meaning of "${word}"...`;
+        infoTextEl.classList.remove('hidden');
+        meaningContainerEl.classList.add('hidden');
+      }
+
+      function setError(msg) {
+        infoTextEl.textContent = msg;
+        meaningContainerEl.classList.add('hidden');
+      }
+
+      function renderDefinitions(entries) {
+        titleEl.textContent = entries[0].word;
+        const items = [];
+        for (const entry of entries) {
+          if (!entry.meanings) continue;
+          for (const m of entry.meanings) {
+            const pos = m.partOfSpeech || '';
+            for (const d of (m.definitions || [])) {
+              items.push({ pos, def: d.definition, example: d.example });
+            }
+          }
+        }
+        defsOl.innerHTML = '';
+        if (!items.length) {
+          const li = document.createElement('li');
+          li.textContent = 'No definitions found.';
+          defsOl.appendChild(li);
+        } else {
+          for (const it of items) {
+            const li = document.createElement('li');
+            li.innerHTML = `${it.def} ${it.pos ? `<span class="pos">(${it.pos})</span>` : ''}` + (it.example ? `<div style="font-size:12px;opacity:.8;margin-top:4px">Example: <em>${it.example}</em></div>` : '');
+            defsOl.appendChild(li);
+          }
+        }
+      }
+
+      function pickAudio(entries) {
+        for (const entry of entries) {
+          for (const p of (entry.phonetics || [])) {
+            if (p.audio) return p.audio;
+          }
+        }
+        return '';
+      }
+
+      async function fetchAPI(word) {
+        try {
+          const q = (word || '').trim();
+          if (!q) {
+            setError('Please type or say a word first.');
+            return;
+          }
+
+          setLoading(q);
+
+          const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(q)}`;
+          const res = await fetch(url);
+          const data = await res.json();
+
+          if (!Array.isArray(data)) {
+            setError('No definitions found. Check the spelling and try again.');
+            return;
+          }
+
+          renderDefinitions(data);
+
+          const audioSrc = pickAudio(data);
+          if (audioSrc) {
+            audioEl.src = audioSrc;
+            audioEl.classList.remove('hidden');
+            audioEl.play().catch(()=>{});
+          } else {
+            audioEl.removeAttribute('src');
+            audioEl.classList.add('hidden');
+          }
+
+          infoTextEl.textContent = '';
+          meaningContainerEl.classList.remove('hidden');
+        } catch (err) {
+          console.error(err);
+          setError('An error occurred. Please try again later.');
+        }
+      }
+
+      inputEl.addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') fetchAPI(e.target.value);
+      });
+      searchBtn.addEventListener('click', () => fetchAPI(inputEl.value));
+
+      // Speech recognition
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        micBtn.addEventListener('click', () => {
+          recognition.start();
+          infoTextEl.textContent = 'Listening... 🎤';
+        });
+
+        recognition.addEventListener('result', (event) => {
+          const transcript = event.results[0][0].transcript;
+          inputEl.value = transcript;
+          fetchAPI(transcript);
+        });
+
+        recognition.addEventListener('error', () => {
+          setError('Sorry, could not recognize speech. Try again.');
+        });
+      } else {
+        micBtn.disabled = true;
+        micBtn.textContent = 'No Mic';
+      }
+
+      inputEl.focus();
+    });
+  </script>
+</body>
+</html>
