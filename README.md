@@ -22,7 +22,7 @@ cd DICTIONARY
 ```
 ### 2. Run Locally 
 ```bash
-Open Dictionary.html in your browser.
+Open index.html in your browser.
 ```
 ## 3. Deployment
 The app is deployed on **Vercel**, which provides easy hosting for frontend projects.
